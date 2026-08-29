@@ -213,6 +213,8 @@ struct PacketizedElementaryStream: PESPacketHeader {
                     data.append(contentsOf: [0x00, 0x00, 0x00, 0x01])
                     data.append(contentsOf: $0)
                 }
+                // trackcast: ingest-latency SEI per IDR, before the first VCL NAL.
+                data.append(TrackcastLatencySEI.nal())
             } else {
                 data.append(contentsOf: [0x00, 0x00, 0x00, 0x01, 0x09, 0x30])
             }
