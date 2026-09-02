@@ -27,7 +27,7 @@ final class TSWriter {
             data.streamType = audioFormat.formatDescription.streamType
             data.elementaryPID = Self.defaultAudioPID
             #if DEBUG
-            print("[TCDBG] TSWriter.audioFormat set: subType=\(audioFormat.formatDescription.mediaSubType) streamType=\(audioFormat.formatDescription.streamType) sr=\(audioFormat.sampleRate) ch=\(audioFormat.channelCount)")
+            NSLog("[TCDBG] TSWriter.audioFormat set: subType=\(audioFormat.formatDescription.mediaSubType) streamType=\(audioFormat.formatDescription.streamType) sr=\(audioFormat.sampleRate) ch=\(audioFormat.channelCount)")
             #endif
             if audioFormat.formatDescription.mediaSubType == .opus {
                 // ETSI TS Opus (draft) signaling for private-PES (0xBD) audio, the

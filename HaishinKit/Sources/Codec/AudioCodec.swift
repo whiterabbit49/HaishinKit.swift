@@ -150,19 +150,19 @@ final class AudioCodec {
 
     private func makeAudioConverter() -> AVAudioConverter? {
         #if DEBUG
-        print("[TCDBG] makeAudioConverter: format=\(settings.format) inputFormat=\(String(describing: inputFormat))")
+        NSLog("[TCDBG] makeAudioConverter: format=\(settings.format) inputFormat=\(String(describing: inputFormat))")
         #endif
         guard
             let inputFormat,
             let outputFormat = settings.format.makeOutputAudioFormat(inputFormat, sampleRate: settings.sampleRate, channelMap: settings.channelMap) else {
             #if DEBUG
-            print("[TCDBG] makeAudioConverter: outputFormat=nil, input=\(String(describing: inputFormat?.formatDescription))")
+            NSLog("[TCDBG] makeAudioConverter: outputFormat=nil, input=\(String(describing: inputFormat?.formatDescription))")
             #endif
             return nil
         }
         let converter = AVAudioConverter(from: inputFormat, to: outputFormat)
         #if DEBUG
-        print("[TCDBG] makeAudioConverter: outputFormat=\(outputFormat) converter=\(converter != nil)")
+        NSLog("[TCDBG] makeAudioConverter: outputFormat=\(outputFormat) converter=\(converter != nil)")
         #endif
         settings.apply(converter, oldValue: nil)
         if inputFormat.formatDescription.mediaSubType == .linearPCM {
