@@ -108,6 +108,39 @@ final class TSWriter {
                 clockTimeStamp = audioTimeStamp
             }
         }
+        if audioFormat?.formatDescription.mediaSubType == .opus {
+            let dataPointer = audioBuffer.data
+            let count = max(Int(audioBuffer.packetCount), 1)
+            let uniformSize = count > 1 ? Int(audioBuffer.byteLength) / count : Int(audioBuffer.byteLength)
+            for index in 0..<count {
+                let offset: Int
+                let size: Int
+                if let descriptions = audioBuffer.packetDescriptions {
+                    let d = descriptions[index]
+                    offset = Int(d.mStartOffset)
+                    size = Int(d.mDataByteSize)
+                } else {
+                    offset = index * uniformSize
+                    size = index == count - 1 ? Int(audioBuffer.byteLength) - offset : uniformSize
+                }
+                guard size > 0, offset + size <= Int(audioBuffer.byteLength) else {
+                    continue
+                }
+                let payload = Self.makeOpusAccessUnit(
+                    Data(bytes: dataPointer.advanced(by: offset), count: size)
+                )
+                if var pes = PacketizedElementaryStream(audioPayload: payload, when: when, timeStamp: audioTimeStamp) {
+                    pes.streamID = 192
+                    writePacketizedElementaryStream(
+                        TSWriter.defaultAudioPID,
+                        PES: pes,
+                        timeStamp: when.makeTime(),
+                        randomAccessIndicator: true
+                    )
+                }
+            }
+            return
+        }
         if var pes = PacketizedElementaryStream(audioBuffer, when: when, timeStamp: audioTimeStamp) {
             pes.streamID = 192
             writePacketizedElementaryStream(
@@ -119,7 +152,7 @@ final class TSWriter {
         }
     }
 
-    /// PMT elementary-stream descriptors for an Opus (0xBD) audio track:
+    /// PMT elementary-stream descriptors for an Opus (0x06) audio track:
     /// registration descriptor "Opus" + extension descriptor (0x7F) whose
     /// extension tag 0x80 introduces the opus_audio_descriptor.
     private static func makeOpusDescriptors(_ format: AVAudioFormat) -> Data {
@@ -128,6 +161,22 @@ final class TSWriter {
         descriptors.append(contentsOf: [0x05, 0x04, 0x4F, 0x70, 0x75, 0x73]) // registration: "Opus"
         descriptors.append(contentsOf: [0x7F, 0x02, 0x80, channelConfigCode]) // opus_audio_descriptor
         return descriptors
+    }
+
+    /// ETSI TS Opus (draft) opus_access_unit: an 11-bit all-ones prefix, no trim
+    /// or extension flags, then the payload size in base-255 bytes, then the raw
+    /// Opus packet. MediaMTX (mediacommon) unmarshals — and silently drops —
+    /// every PES that lacks this control header.
+    private static func makeOpusAccessUnit(_ packet: Data) -> Data {
+        var au = Data([0x7F, 0xE0]) // 11-bit 0x3FF prefix (0 + ten ones) + zero flags + reserved
+        var size = packet.count
+        while size >= 255 {
+            au.append(255)
+            size -= 255
+        }
+        au.append(UInt8(size))
+        au.append(packet)
+        return au
     }
 
     /// Appends a buffer.

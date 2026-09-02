@@ -279,6 +279,27 @@ struct PacketizedElementaryStream: PESPacketHeader {
         }
     }
 
+    /// A raw single-Opus-packet audio PES. MediaMTX (mediacommon) maps one PES to
+    /// one Opus RTP packet, so a converted buffer carrying several Opus packets
+    /// must be split — one PES per packet — or every packet downstream is
+    /// concatenated garbage that decoders silently drop.
+    init?(audioPayload: Data, when: AVAudioTime, timeStamp: CMTime) {
+        data = audioPayload
+        optionalPESHeader = PESOptionalHeader()
+        optionalPESHeader?.dataAlignmentIndicator = true
+        optionalPESHeader?.setTimestamp(
+            timeStamp,
+            presentationTimeStamp: when.makeTime(),
+            decodeTimeStamp: .invalid
+        )
+        let length = data.count + (optionalPESHeader?.data.count ?? 0)
+        if length < Int(UInt16.max) {
+            packetLength = UInt16(length)
+        } else {
+            return nil
+        }
+    }
+
     func arrayOfPackets(_ PID: UInt16, PCR: UInt64?) -> [TSPacket] {
         let payload = self.payload
         var packets: [TSPacket] = []
