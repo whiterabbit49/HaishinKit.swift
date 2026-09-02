@@ -28,6 +28,7 @@ final class TSWriter {
             data.elementaryPID = Self.defaultAudioPID
             pmt.elementaryStreamSpecificData.append(data)
             audioContinuityCounter = 0
+            opusHeadSent = false
             writeProgramIfNeeded()
         }
     }
@@ -97,6 +98,25 @@ final class TSWriter {
                 clockTimeStamp = audioTimeStamp
             }
         }
+        if audioFormat?.formatDescription.mediaSubType == .opus, !opusHeadSent {
+            // RFC 7845 OpusHead as the track's first PES: TS demuxers (MediaMTX /
+            // mediacommon) identify the 0xBD private stream as Opus by sniffing
+            // this magic; without it the audio track is unrecognized.
+            opusHeadSent = true
+            if var pes = PacketizedElementaryStream(
+                audioPayload: Self.makeOpusHead(audioFormat),
+                when: when,
+                timeStamp: audioTimeStamp
+            ) {
+                pes.streamID = 192
+                writePacketizedElementaryStream(
+                    TSWriter.defaultAudioPID,
+                    PES: pes,
+                    timeStamp: when.makeTime(),
+                    randomAccessIndicator: true
+                )
+            }
+        }
         if var pes = PacketizedElementaryStream(audioBuffer, when: when, timeStamp: audioTimeStamp) {
             pes.streamID = 192
             writePacketizedElementaryStream(
@@ -106,6 +126,24 @@ final class TSWriter {
                 randomAccessIndicator: true
             )
         }
+    }
+
+    /// One-shot guard for the OpusHead PES (see `append(_:when:)`); reset whenever
+    /// the audio format (re)attaches so a new track re-announces its head.
+    private var opusHeadSent = false
+
+    /// RFC 7845 identification header (19 bytes, mapping family 0).
+    private static func makeOpusHead(_ format: AVAudioFormat?) -> Data {
+        let channels = UInt8(min(format?.channelCount ?? 2, 255))
+        let inputSampleRate = UInt32(format?.sampleRate ?? 48_000)
+        var head = Data([0x4F, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64]) // "OpusHead"
+        head.append(1) // version
+        head.append(channels)
+        head.append(contentsOf: withUnsafeBytes(of: UInt16(312).littleEndian, Array.init)) // pre-skip (6.5 ms @ 48 kHz)
+        head.append(contentsOf: withUnsafeBytes(of: inputSampleRate.littleEndian, Array.init))
+        head.append(contentsOf: withUnsafeBytes(of: Int16(0).littleEndian, Array.init)) // output gain
+        head.append(0) // mapping family
+        return head
     }
 
     /// Appends a buffer.

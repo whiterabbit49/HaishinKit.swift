@@ -6,7 +6,7 @@ import libsrt
 
 /// An actor that provides the interface to control a one-way channel over a SRTConnection.
 public actor SRTStream {
-    static let supportedAudioCodecs: [AudioCodecSettings.Format] = [.aac]
+    static let supportedAudioCodecs: [AudioCodecSettings.Format] = [.aac, .opus]
     static let supportedVideoCodecs: [VideoCodecSettings.Format] = VideoCodecSettings.Format.allCases
 
     /// The expected medias for transport stream.

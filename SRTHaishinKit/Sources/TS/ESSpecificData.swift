@@ -17,6 +17,10 @@ enum ESStreamType: UInt8 {
     case h264 = 0x1B
     case h265 = 0x24
 
+    /// Opus in a private PES — the convention MediaMTX (mediacommon) and other
+    /// TS demuxers sniff via the OpusHead magic in the first payload.
+    case opus = 0xBD
+
     var headerSize: Int {
         switch self {
         case .adtsAac:

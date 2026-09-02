@@ -12,6 +12,8 @@ extension CMFormatDescription {
             return .adtsAac
         case .mpeg4AAC:
             return .adtsAac
+        case .opus:
+            return .opus
         default:
             return .unspecific
         }

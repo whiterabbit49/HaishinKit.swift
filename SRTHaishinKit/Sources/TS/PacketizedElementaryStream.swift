@@ -254,8 +254,35 @@ struct PacketizedElementaryStream: PESPacketHeader {
         guard let audioCompressedBuffer else {
             return nil
         }
-        data = .init(count: Int(audioCompressedBuffer.byteLength) + AudioSpecificConfig.adtsHeaderSize)
-        audioCompressedBuffer.encode(to: &data)
+        if audioCompressedBuffer.format.formatDescription.mediaSubType == .opus {
+            // Opus-in-MPEGTS: raw Opus frames inside a private PES (0xBD) — no ADTS framing.
+            data = .init(
+                bytes: audioCompressedBuffer.data,
+                count: Int(audioCompressedBuffer.byteLength)
+            )
+        } else {
+            data = .init(count: Int(audioCompressedBuffer.byteLength) + AudioSpecificConfig.adtsHeaderSize)
+            audioCompressedBuffer.encode(to: &data)
+        }
+        optionalPESHeader = PESOptionalHeader()
+        optionalPESHeader?.dataAlignmentIndicator = true
+        optionalPESHeader?.setTimestamp(
+            timeStamp,
+            presentationTimeStamp: when.makeTime(),
+            decodeTimeStamp: .invalid
+        )
+        let length = data.count + (optionalPESHeader?.data.count ?? 0)
+        if length < Int(UInt16.max) {
+            packetLength = UInt16(length)
+        } else {
+            return nil
+        }
+    }
+
+    /// A raw-payload audio PES — used to emit the RFC 7845 OpusHead as the first
+    /// packet of an Opus track so TS demuxers recognize it.
+    init?(audioPayload: Data, when: AVAudioTime, timeStamp: CMTime) {
+        data = audioPayload
         optionalPESHeader = PESOptionalHeader()
         optionalPESHeader?.dataAlignmentIndicator = true
         optionalPESHeader?.setTimestamp(
