@@ -279,25 +279,6 @@ struct PacketizedElementaryStream: PESPacketHeader {
         }
     }
 
-    /// A raw-payload audio PES — used to emit the RFC 7845 OpusHead as the first
-    /// packet of an Opus track so TS demuxers recognize it.
-    init?(audioPayload: Data, when: AVAudioTime, timeStamp: CMTime) {
-        data = audioPayload
-        optionalPESHeader = PESOptionalHeader()
-        optionalPESHeader?.dataAlignmentIndicator = true
-        optionalPESHeader?.setTimestamp(
-            timeStamp,
-            presentationTimeStamp: when.makeTime(),
-            decodeTimeStamp: .invalid
-        )
-        let length = data.count + (optionalPESHeader?.data.count ?? 0)
-        if length < Int(UInt16.max) {
-            packetLength = UInt16(length)
-        } else {
-            return nil
-        }
-    }
-
     func arrayOfPackets(_ PID: UInt16, PCR: UInt64?) -> [TSPacket] {
         let payload = self.payload
         var packets: [TSPacket] = []

@@ -26,9 +26,16 @@ final class TSWriter {
             var data = ESSpecificData()
             data.streamType = audioFormat.formatDescription.streamType
             data.elementaryPID = Self.defaultAudioPID
+            if audioFormat.formatDescription.mediaSubType == .opus {
+                // ETSI TS Opus (draft) signaling for private-PES (0xBD) audio, the
+                // form MediaMTX / mediacommon require: a registration descriptor
+                // identifying "Opus" plus an opus_audio_descriptor (extension 0x80)
+                // carrying the channel_config_code (0x01 mono / 0x02 stereo).
+                data.esDescriptors = Self.makeOpusDescriptors(audioFormat)
+                data.esInfoLength = UInt16(data.esDescriptors.count)
+            }
             pmt.elementaryStreamSpecificData.append(data)
             audioContinuityCounter = 0
-            opusHeadSent = false
             writeProgramIfNeeded()
         }
     }
@@ -98,25 +105,6 @@ final class TSWriter {
                 clockTimeStamp = audioTimeStamp
             }
         }
-        if audioFormat?.formatDescription.mediaSubType == .opus, !opusHeadSent {
-            // RFC 7845 OpusHead as the track's first PES: TS demuxers (MediaMTX /
-            // mediacommon) identify the 0xBD private stream as Opus by sniffing
-            // this magic; without it the audio track is unrecognized.
-            opusHeadSent = true
-            if var pes = PacketizedElementaryStream(
-                audioPayload: Self.makeOpusHead(audioFormat),
-                when: when,
-                timeStamp: audioTimeStamp
-            ) {
-                pes.streamID = 192
-                writePacketizedElementaryStream(
-                    TSWriter.defaultAudioPID,
-                    PES: pes,
-                    timeStamp: when.makeTime(),
-                    randomAccessIndicator: true
-                )
-            }
-        }
         if var pes = PacketizedElementaryStream(audioBuffer, when: when, timeStamp: audioTimeStamp) {
             pes.streamID = 192
             writePacketizedElementaryStream(
@@ -128,22 +116,15 @@ final class TSWriter {
         }
     }
 
-    /// One-shot guard for the OpusHead PES (see `append(_:when:)`); reset whenever
-    /// the audio format (re)attaches so a new track re-announces its head.
-    private var opusHeadSent = false
-
-    /// RFC 7845 identification header (19 bytes, mapping family 0).
-    private static func makeOpusHead(_ format: AVAudioFormat?) -> Data {
-        let channels = UInt8(min(format?.channelCount ?? 2, 255))
-        let inputSampleRate = UInt32(format?.sampleRate ?? 48_000)
-        var head = Data([0x4F, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64]) // "OpusHead"
-        head.append(1) // version
-        head.append(channels)
-        head.append(contentsOf: withUnsafeBytes(of: UInt16(312).littleEndian, Array.init)) // pre-skip (6.5 ms @ 48 kHz)
-        head.append(contentsOf: withUnsafeBytes(of: inputSampleRate.littleEndian, Array.init))
-        head.append(contentsOf: withUnsafeBytes(of: Int16(0).littleEndian, Array.init)) // output gain
-        head.append(0) // mapping family
-        return head
+    /// PMT elementary-stream descriptors for an Opus (0xBD) audio track:
+    /// registration descriptor "Opus" + extension descriptor (0x7F) whose
+    /// extension tag 0x80 introduces the opus_audio_descriptor.
+    private static func makeOpusDescriptors(_ format: AVAudioFormat) -> Data {
+        let channelConfigCode: UInt8 = (format.channelCount >= 2) ? 0x02 : 0x01
+        var descriptors = Data()
+        descriptors.append(contentsOf: [0x05, 0x04, 0x4F, 0x70, 0x75, 0x73]) // registration: "Opus"
+        descriptors.append(contentsOf: [0x7F, 0x02, 0x80, channelConfigCode]) // opus_audio_descriptor
+        return descriptors
     }
 
     /// Appends a buffer.
