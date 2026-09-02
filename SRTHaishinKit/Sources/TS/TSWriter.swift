@@ -211,8 +211,24 @@ final class TSWriter {
     }
 
     private func write(_ data: Data) {
+        #if DEBUG
+        if Self.tsDumpHandle == nil, let url = Self.tsDumpURL {
+            Self.tsDumpHandle = try? FileHandle(forWritingTo: url)
+        }
+        if let handle = Self.tsDumpHandle {
+            handle.write(data)
+            Self.tsDumpBytes += data.count
+            if Self.tsDumpBytes > 2_000_000 { Self.tsDumpHandle = nil }
+        }
+        #endif
         continuation?.yield(data)
     }
+
+    #if DEBUG
+    nonisolated(unsafe) static var tsDumpURL: URL?
+    nonisolated(unsafe) private(set) static var tsDumpBytes: Int = 0
+    nonisolated(unsafe) private static var tsDumpHandle: FileHandle?
+    #endif
 
     private func writeProgram() {
         pmt.PCRPID = pcrPID
@@ -250,3 +266,13 @@ final class TSWriter {
         return packets
     }
 }
+
+#if DEBUG
+/// Debug facade so external tools (TcOpusProbe) can capture the emitted TS.
+public enum TCTSDump {
+    public static var url: URL? {
+        get { TSWriter.tsDumpURL }
+        set { TSWriter.tsDumpURL = newValue }
+    }
+}
+#endif

@@ -23,6 +23,7 @@ let package = Package(
         .visionOS(.v1)
     ],
     products: [
+        .executable(name: "TcOpusProbe", targets: ["TcOpusProbe"]),
         .library(name: "HaishinKit", targets: ["HaishinKit"]),
         .library(name: "RTMPHaishinKit", targets: ["RTMPHaishinKit"]),
         .library(name: "SRTHaishinKit", targets: ["SRTHaishinKit"]),
@@ -43,6 +44,11 @@ let package = Package(
             name: "libdatachannel",
             url: "https://github.com/HaishinKit/libdatachannel-xcframework/releases/download/v0.24.0/libdatachannel.xcframework.zip",
             checksum: "52163eed2c9d652d913b20d1fd5a1925c5982b1dcdf335fd916c72ffa385bb26"
+        ),
+        .target(
+            name: "TcOpusProbe",
+            dependencies: ["SRTHaishinKit"],
+            path: "Tools/TcOpusProbe"
         ),
         .target(
             name: "HaishinKit",

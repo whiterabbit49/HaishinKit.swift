@@ -9,17 +9,21 @@ enum ESStreamType: UInt8 {
     case mpeg1Audio = 0x03
     case mpeg2Audio = 0x04
     case mpeg2TabledData = 0x05
+    /// 0x06: PES packets containing private data — reused for Opus-in-TS, where
+    /// the "Opus" registration + opus_audio_descriptor PMT descriptors carry the
+    /// actual identification (same signaling ffmpeg emits; go-astits calls this
+    /// StreamTypePrivateData). Kept the historical case name for compatibility.
     case mpeg2PacketizedData = 0x06
+
+    /// Retained alias so `.opus` reads naturally at the CMFormatDescription
+    /// mapping site; resolves to the same 0x06 private-data stream type.
+    static var opusStreamType: ESStreamType { .mpeg2PacketizedData }
 
     case adtsAac = 0x0F
     case h263 = 0x10
 
     case h264 = 0x1B
     case h265 = 0x24
-
-    /// Opus in a private PES — the convention MediaMTX (mediacommon) and other
-    /// TS demuxers sniff via the OpusHead magic in the first payload.
-    case opus = 0xBD
 
     var headerSize: Int {
         switch self {

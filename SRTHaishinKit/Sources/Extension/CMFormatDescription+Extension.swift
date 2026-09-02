@@ -13,7 +13,7 @@ extension CMFormatDescription {
         case .mpeg4AAC:
             return .adtsAac
         case .opus:
-            return .opus
+            return .opusStreamType
         default:
             return .unspecific
         }
