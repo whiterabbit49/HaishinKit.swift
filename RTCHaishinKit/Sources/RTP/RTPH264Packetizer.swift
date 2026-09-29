@@ -40,7 +40,14 @@ final class RTPH264Packetizer<T: RTPPacketizerDelegate>: RTPPacketizer {
     }
 
     func append(_ buffer: CMSampleBuffer, lambda: (RTPPacket) -> Void) {
-        let nals = nalUnitReader.read(buffer)
+        var nals = nalUnitReader.read(buffer)
+        // Trackcast: per-IDR ingest-latency SEI (raw NAL, byte contract shared with the
+        // SRT/TS + Android injectors). Outgoing path only (WHEP decode never reaches this
+        // method); non-IDR access units are untouched.
+        if nals.contains(where: { !$0.isEmpty && $0[0] & 0x1F == 5 }),
+           let firstVCL = nals.firstIndex(where: { !$0.isEmpty && (1...5).contains($0[0] & 0x1F) }) {
+            nals.insert(TrackcastLatencySEI.nal(), at: firstVCL)
+        }
         for i in 0..<nals.count {
             let marker = i == nals.count - 1
 

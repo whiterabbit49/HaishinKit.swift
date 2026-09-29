@@ -263,6 +263,28 @@ a=fmtp:98 level-asymmetry-allowed=1;packetization-mode=1;profile-level-id=42e01f
         }
     }
 
+    /// Trackcast: minimal stats surface. GAP: the vendored libdatachannel v0.24.0
+    /// xcframework exports NEITHER `rtcGetStats` (the JSON stats API, added in later
+    /// libdatachannel versions) NOR `rtcGetLocalCandidateStats` — so RTT, byte/bitrate
+    /// and loss counters are UNAVAILABLE from this fork; consumers must treat those
+    /// fields as 0. The narrowest existing alternative is the selected ICE candidate
+    /// pair (`rtcGetSelectedCandidatePair`), returned as a tiny JSON object:
+    /// `{"local":"<candidate>","remote":"<candidate>"}`. Nil on error/not connected.
+    public func stats() -> String? {
+        var local = [CChar](repeating: 0, count: Self.bufferSize)
+        var remote = [CChar](repeating: 0, count: Self.bufferSize)
+        let result = rtcGetSelectedCandidatePair(
+            connection,
+            &local, Int32(Self.bufferSize),
+            &remote, Int32(Self.bufferSize)
+        )
+        guard result >= 0 else {
+            logger.warn("rtcGetSelectedCandidatePair failed: ", result)
+            return nil
+        }
+        return "{\"local\":\"\(String(cString: local))\",\"remote\":\"\(String(cString: remote))\"}"
+    }
+
     public func createAnswer() throws -> String {
         return try CUtil.getString { buffer, size in
             rtcCreateAnswer(connection, buffer, size)
